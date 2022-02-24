@@ -57,6 +57,7 @@ public class ClientServiceImpl implements ClientService{
                 .date(new Date())
                 .entityId(user.getId())
                 .actionOwner(actionOwner)
+                .entityName(user.getClass().getSimpleName())
                 .build();
 
         this.auditRepository.save(audit);
