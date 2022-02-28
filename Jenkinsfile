@@ -12,10 +12,12 @@ pipeline {
         NEXUS_REPOSITORY_SNAPSHOT = "maven-nexus-repo-snapshot/"
         NEXUS_CREDENTIAL_ID = "nexus3"
         REPOSITORY = "https://github.com/DivanioSilva/Cardif-audit-POC.git"
-        registry = "dcsilva/Cardif-audit-POC"
-        registryCredential = "DockerHub"
+        REGISTRY = "dcsilva/audit-pic"
+        REGISTRY_CREDENTIAL = "DockerHub"
+        DOCKER_IMAGE = ''
+        DOCKER_CONTAINER_NAME = ''
     }
-    
+
     stages {
         stage('get_commit_details') {
                 steps {
@@ -34,28 +36,25 @@ pipeline {
         }
         stage("Publish to Nexus Repository Manager") {
             steps {
-                timeout(time: 20, unit: 'MINUTES'){
+                timeout(time: 5, unit: 'MINUTES'){
                     input message: "Should we deploy this artifact on Nexus?", ok: "Yes, we should."
                 }
                 script {
                     pom = readMavenPom file: "pom.xml";
                     def nexusRepoName = pom.version.endsWith("SNAPSHOT") ? NEXUS_REPOSITORY_SNAPSHOT : NEXUS_REPOSITORY_RELEASE
                     echo 'nexusRepoName:------> ' +nexusRepoName
-                    // Find built artifact under target folder
                     filesByGlob = findFiles(glob: "target/*.${pom.packaging}");
                     echo 'filesByGlob' +filesByGlob
-                    // Print some info from the artifact found
                     echo "${filesByGlob[0].name} ${filesByGlob[0].path} ${filesByGlob[0].directory} ${filesByGlob[0].length} ${filesByGlob[0].lastModified}"
-                    // Extract the path from the File found
                     artifactPath = filesByGlob[0].path;
                     echo 'artifactPath: '+ artifactPath
-                    // Assign to a boolean response verifying If the artifact name exists
                     artifactExists = fileExists artifactPath;
                     echo 'artifactExists:' +artifactExists
                     if(artifactExists) {
                         echo "*** File: ${artifactPath}, group: ${pom.groupId}, packaging: ${pom.packaging}, version ${pom.version}";
-                        //artifactPath: target/spring-boot-graphql-98-RELEASE.jar
                         def values = artifactPath.split('target/'+pom.name+'-');
+                        DOCKER_IMAGE = REGISTRY +':'+  currentBuild.number
+                        DOCKER_CONTAINER_NAME = pom.name
                         echo 'values: '+values
                         def finalVersion = values[1].split('.'+pom.packaging);
                         echo 'finalVersion: '+finalVersion
@@ -81,18 +80,18 @@ pipeline {
         }
         stage('Building the Docker image') {
             steps {
-                timeout(time: 20, unit: 'MINUTES'){
+                timeout(time: 5, unit: 'MINUTES'){
                         input message: "Should we build the docker image?", ok: "Yes, we should."
                 }
                 script {
-                    dockerImage = docker.build registry + ":$BUILD_NUMBER"
+                    dockerImage = docker.build(REGISTRY + ":$BUILD_NUMBER")
                 }
             }
         }
-        stage('Deploy the Docker image') {
+        stage('Pushing Docker image to DockerHub') {
             steps {
                 script {
-                    docker.withRegistry( '', registryCredential ) {
+                    docker.withRegistry( '', REGISTRY_CREDENTIAL ) {
                         dockerImage.push()
                     }
                 }
@@ -100,12 +99,19 @@ pipeline {
         }
         stage('Run Docker image') {
             steps {
-                timeout(time: 20, unit: 'MINUTES'){
+                timeout(time: 5, unit: 'MINUTES'){
                         input message: "Should we run the docker image?", ok: "Yes, we should."
                 }
-                script {
-                    sh "docker run --name containerTestName -p 8000:8080 dcsilva/spring-boot-graphql:2"
-                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                    echo 'Docker image: ---> ' + DOCKER_IMAGE
+                    echo 'Docker container name: ---> ' +DOCKER_CONTAINER_NAME
+                    sh "docker stop ${DOCKER_IMAGE} | true"
+                    sh "docker rm ${DOCKER_IMAGE} | true"
+                    sh "docker run --name ${DOCKER_CONTAINER_NAME} -d -p 8091:8080 ${DOCKER_IMAGE}"
+
             }
         }
         stage('Cleaning up') {
