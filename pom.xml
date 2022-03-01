@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.cardif</groupId>
     <artifactId>Cardif-Sync-POC</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>${revision}-SNAPSHOT</version>
     <name>Cardif-Sync-POC</name>
     <description>Cardif-Sync-POC</description>
     <properties>

@@ -16,6 +16,7 @@ pipeline {
         REGISTRY_CREDENTIAL = "DockerHub"
         DOCKER_IMAGE = ''
         DOCKER_CONTAINER_NAME = ''
+        DOCKER_IMAGE_OLD = ''
     }
 
     stages {
@@ -55,6 +56,11 @@ pipeline {
                         def values = artifactPath.split('target/'+pom.name+'-');
                         DOCKER_IMAGE = REGISTRY +':'+  currentBuild.number
                         DOCKER_CONTAINER_NAME = pom.name
+                        int buildNumber = currentBuild.number;
+                        int a = 1;
+                        int previousTag = buildNumber - a;
+                        DOCKER_IMAGE_OLD = REGISTRY +':'+ previousTag
+                        echo 'result: '+result
                         echo 'values: '+values
                         def finalVersion = values[1].split('.'+pom.packaging);
                         echo 'finalVersion: '+finalVersion
@@ -106,11 +112,12 @@ pipeline {
         }
         stage('Deploy') {
             steps {
-                    echo 'Docker image: ---> ' + DOCKER_IMAGE
-                    echo 'Docker container name: ---> ' +DOCKER_CONTAINER_NAME
-                    sh "docker stop ${DOCKER_IMAGE} | true"
-                    sh "docker rm ${DOCKER_IMAGE} | true"
-                    sh "docker run --name ${DOCKER_CONTAINER_NAME} -d -p 8091:8080 ${DOCKER_IMAGE}"
+                echo 'Previous docker image: ---> ' + DOCKER_IMAGE_OLD
+                echo 'Docker image: ---> ' + DOCKER_IMAGE
+                echo 'Docker container name: ---> ' +DOCKER_CONTAINER_NAME
+                sh "docker stop ${DOCKER_IMAGE_OLD} | true"
+                sh "docker rm ${DOCKER_IMAGE_OLD} | true"
+                sh "docker run --name ${DOCKER_CONTAINER_NAME} -d -p 8091:8080 ${DOCKER_IMAGE}"
 
             }
         }
