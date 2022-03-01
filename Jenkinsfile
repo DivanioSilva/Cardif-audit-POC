@@ -16,7 +16,7 @@ pipeline {
         REGISTRY_CREDENTIAL = "DockerHub"
         DOCKER_IMAGE = ''
         DOCKER_IMAGE_NAME_OLD = ''
-        DOCKER_CONTAINER_ID_OLD = ''
+        DOCKER_CONTAINER_NAME = ''
     }
 
     stages {
@@ -68,7 +68,7 @@ pipeline {
                         int a = 1;
                         int previousTag = buildNumber - a;
                         DOCKER_IMAGE_NAME_OLD = REGISTRY +':'+ previousTag
-                        DOCKER_CONTAINER_ID_OLD = pom.name
+                        DOCKER_CONTAINER_NAME = pom.name
                         echo 'values: '+values
                         def finalVersion = values[1].split('.'+pom.packaging);
                         echo 'finalVersion: '+finalVersion
@@ -120,32 +120,26 @@ pipeline {
                 }
                 script{
                     def doc_containers = sh(returnStdout: true, script: 'docker ps --format "{{.ID}}||{{.Image}}||{{.Names}}"')
-                    def String[] finalVersion = doc_containers.split('\n');
+                    def finalVersion = doc_containers.split('\n');
                     def containerId='';
-                    if(!finalVersion.isEmpty()){
-                        for (i in finalVersion) {
-                            if(i.contains(REGISTRY)){
-                                echo 'ENCONTREI O CONTAINER QUE BUSCO: ' +i
-                                DOCKER_IMAGE_OLD = i.substring(0,12)
-                                echo 'Container id= ' + DOCKER_IMAGE_OLD
-                                sh "docker stop ${DOCKER_CONTAINER_ID_OLD} | true"
-                                sh "docker container rm ${DOCKER_CONTAINER_ID_OLD} | true"
-                                sh "docker rmi ${DOCKER_IMAGE_NAME_OLD} | true"
-                            }
+                    for (i in finalVersion) {
+                        if(i.contains(REGISTRY)){
+                            echo 'ENCONTREI O CONTAINER QUE BUSCO: ' +i
+                            DOCKER_CONTAINER_ID = i.substring(0,12)
+                            echo 'Container id= ' + DOCKER_CONTAINER_ID
+                            sh "docker stop ${DOCKER_CONTAINER_ID} | true"
+                            sh "docker container rm ${DOCKER_CONTAINER_ID} | true"
                         }
                     }
                 }
-
-                echo 'Previous docker image: ---> ' + DOCKER_IMAGE_OLD
-                echo 'Docker image: ---> ' + DOCKER_IMAGE
-                echo 'Docker container name: ---> ' +DOCKER_CONTAINER_ID_OLD
-                sh "docker run --name ${DOCKER_CONTAINER_ID_OLD} -d -p 8090:8080 ${DOCKER_IMAGE}"
+                sh "docker run --name ${DOCKER_CONTAINER_NAME} -d -p 8091:8080 ${DOCKER_IMAGE}"
             }
         }
     }
     post {
         always {
-                deleteDir()
+            sh "docker image prune -a -f"
+            deleteDir()
             }
         success {
             echo "Build Success"
